@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"sync"
 )
 
 func main() {
@@ -64,10 +65,13 @@ func main() {
 	paramsOffset := 0
 
 	sem := make(chan int, pFlag)
-	completed := make(chan bool, invocationsCount)
+
+	var wg sync.WaitGroup
 
 	for j := 0; j < invocationsCount; j++ {
+		wg.Add(1)
 		go func(paramsOffset int) {
+			defer wg.Done()
 			sem <- 1
 			cmd := exec.Command(commandName, append(os.Args[i:], params[paramsOffset:paramsOffset+nFlag]...)...)
 			cmdOut, err := cmd.StdoutPipe()
@@ -95,14 +99,11 @@ func main() {
 				log.Fatal(err)
 			}
 			<-sem
-			completed <- true
 
 		}(paramsOffset)
 		paramsOffset += nFlag
 	}
 
-	for j := 0; j < invocationsCount; j++ {
-		<-completed
-	}
+	wg.Wait()
 
 }
